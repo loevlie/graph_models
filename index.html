@@ -144,14 +144,21 @@ The tradeoff: more parameters fit data better, but cost more bits to describe th
   </table>
 </div>
 
-<h2>Key Takeaway</h2>
+<h2>Key Takeaways</h2>
 <div class="card">
-  <p><b>The configuration model wins almost everywhere</b> because real degree distributions are messy &mdash;
-  they have bumps, cutoffs, and curvature that no 1-2 parameter model captures.
-  Encoding the actual degree sequence costs more in model description, but saves
-  far more in data likelihood.</p>
-  <p>The exception: when a graph's degrees happen to follow <code>k<sup>-3</sup></code> closely (like USAir97),
-  PA's single parameter is enough, and it avoids the cost of transmitting the full degree sequence.</p>
+  <p><b>No single model dominates.</b> The configuration model has the lowest bits-per-edge in most cases,
+  but this comes with a caveat: it uses <em>n</em> parameters (the full degree sequence), while the
+  parametric models use only 1&ndash;2. Config gets to "see" the data before encoding &mdash; it&rsquo;s
+  a two-part code, not a generative model in the same sense as the others.</p>
+  <p><b>Parametric models have real advantages.</b> PA wins on graphs whose degrees happen to follow
+  k<sup>-3</sup> (like USAir97), because its single parameter avoids the cost of transmitting the full
+  degree sequence. Hollywood (Pitman-Yor) offers a tunable power-law exponent with just 2 parameters &mdash;
+  it performs poorly in our raw comparison, but in a practical compression pipeline where you need a
+  lightweight generative model (e.g., for shuffle coding), having only 2 parameters to transmit
+  is a significant advantage over encoding the entire degree sequence.</p>
+  <p><b>Real degree distributions are messy.</b> They have bumps, cutoffs, and curvature that no
+  1&ndash;2 parameter model fully captures. The gap between parametric and non-parametric models
+  reflects how far real graphs are from idealized power laws.</p>
   <p style="font-size:0.88em;color:#555;">Note: these bits-per-edge numbers measure model quality (negative log-likelihood), not actual
   compression with <a href="https://github.com/juliuskunze/shuffle-coding">shuffle coding</a>,
   which additionally saves bits by exploiting graph symmetry (node ordering redundancy).</p>
