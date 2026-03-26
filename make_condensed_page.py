@@ -107,7 +107,9 @@ The tradeoff: more parameters fit data better, but cost more bits to describe th
   </div>
   <div class="model-box" style="background:#e8f0fd;">
     <b style="color:#2980b9;">Hollywood (Pitman-Yor)</b> &mdash;
-    Edge endpoints assigned via Chinese Restaurant Process with discount <code>&alpha;</code> and concentration <code>&theta;</code>.
+    Edge endpoints are assigned to nodes sequentially: each goes to an existing node
+    with probability proportional to <code>degree - &alpha;</code>, or to a new node with probability
+    proportional to <code>&theta; + K&alpha;</code>.
     Predicts <code>P(k) ~ k<sup>-(1+&alpha;)</sup></code> &mdash; tunable power law.
   </div>
   <div class="model-box" style="background:#e8fde8;">
@@ -132,31 +134,19 @@ The tradeoff: more parameters fit data better, but cost more bits to describe th
 <div class="card">
   <h3 style="margin-bottom:8px;">USAir97 &mdash; US airline routes (332 nodes, 2,126 edges)</h3>
   {b64_img('model_overlay_SZIP_USAir97.png')}
-  <p style="margin-top:6px;font-size:0.88em;color:#555;">
-    PA (orange) matches the tail well &mdash; its k<sup>-3</sup> slope is close to the empirical distribution.
-    ER (red bell curve) completely misses the heavy tail. PA actually <b>beats</b> Config here (4.50 vs 4.61 bits/edge)
-    because the degree distribution happens to follow k<sup>-3</sup> closely, so PA's single parameter is enough.
-  </p>
+  <p style="margin-top:6px;font-size:0.88em;color:#555;">Heavy-tailed degree distribution. PA wins here (4.50 vs Config's 4.61 bits/edge).</p>
 </div>
 
 <div class="card">
   <h3 style="margin-bottom:8px;">MUTAG &mdash; molecular graphs (188 molecules, avg 18 nodes)</h3>
   {b64_img('model_overlay_TU_MUTAG.png')}
-  <p style="margin-top:6px;font-size:0.88em;color:#555;">
-    Molecules have narrow, bounded degree distributions (max degree 4). No heavy tail at all.
-    Config wins (5.01 bits/edge) because it encodes the specific degree frequencies. PA and Hollywood
-    waste bits predicting heavy tails that don't exist.
-  </p>
+  <p style="margin-top:6px;font-size:0.88em;color:#555;">Narrow, bounded degrees (max 4). Config wins (5.01 bits/edge).</p>
 </div>
 
 <div class="card">
   <h3 style="margin-bottom:8px;">Gowalla &mdash; social network (196K nodes, 950K edges)</h3>
   {b64_img('model_overlay_REC_Gowalla.png')}
-  <p style="margin-top:6px;font-size:0.88em;color:#555;">
-    Classic social network spanning 4 orders of magnitude in degree. The empirical distribution has
-    curvature in log-log that no single power law captures. Config wins (12.78 bits/edge) by encoding
-    the actual messy distribution rather than approximating it.
-  </p>
+  <p style="margin-top:6px;font-size:0.88em;color:#555;">Degrees span 4 orders of magnitude. Config wins (12.78 bits/edge).</p>
 </div>
 
 <h2>Full Comparison (bits per edge)</h2>
@@ -172,17 +162,34 @@ The tradeoff: more parameters fit data better, but cost more bits to describe th
   </table>
 </div>
 
-<h2>Key Takeaway</h2>
+<h2>How These Models Work With Shuffle Coding</h2>
 <div class="card">
-  <p><b>The configuration model wins almost everywhere</b> because real degree distributions are messy &mdash;
-  they have bumps, cutoffs, and curvature that no 1-2 parameter model captures.
-  Encoding the actual degree sequence costs more in model description, but saves
-  far more in data likelihood.</p>
-  <p>The exception: when a graph's degrees happen to follow <code>k<sup>-3</sup></code> closely (like USAir97),
-  PA's single parameter is enough, and it avoids the cost of transmitting the full degree sequence.</p>
-  <p style="font-size:0.88em;color:#555;">Note: these bits-per-edge numbers measure model quality (negative log-likelihood), not actual
-  compression with <a href="https://github.com/juliuskunze/shuffle-coding">shuffle coding</a>,
-  which additionally saves bits by exploiting graph symmetry (node ordering redundancy).</p>
+  <p>All four models do the same thing: define a probability <code>P(G)</code> for any graph G.
+  Shuffle coding just needs that probability &mdash; it doesn&rsquo;t care how you compute it.</p>
+  <p>The encoder and decoder must agree on the model beforehand. The difference is
+  what they need to agree on:</p>
+  <table style="margin:10px 0;">
+    <tr><th>Model</th><th>What encoder sends first</th><th>Then encodes</th></tr>
+    <tr><td style="color:#c0392b;font-weight:bold;">ER</td><td>1 number: p</td><td>Full adjacency (each edge slot independently)</td></tr>
+    <tr><td style="color:#e67e22;font-weight:bold;">PA</td><td>1 number: m₀</td><td>Each node&rsquo;s degree using P(k)~k⁻³, then wiring</td></tr>
+    <tr><td style="color:#2980b9;font-weight:bold;">Hollywood</td><td>2 numbers: &alpha;, &theta;</td><td>Degree partition via Pitman-Yor, then wiring</td></tr>
+    <tr><td style="color:#27ae60;font-weight:bold;">Config</td><td>n numbers: d₁...dₙ</td><td>Wiring only (degrees already sent)</td></tr>
+  </table>
+  <p>All four are valid codes. Config is &ldquo;generative&rdquo; too &mdash; given the degree sequence,
+  you randomly pair stubs to sample a graph. The only difference is that Config&rsquo;s
+  &ldquo;model description&rdquo; is n numbers instead of 1&ndash;2. Those n numbers are part of the
+  bitstream, and their cost is included in the bits-per-edge numbers above.</p>
+</div>
+
+<h2>Key Takeaways</h2>
+<div class="card">
+  <p><b>No single model is best for all graphs.</b> Config has the lowest bits-per-edge
+  in most cases, but uses n parameters. PA wins when degrees happen to follow k<sup>-3</sup>.
+  Hollywood is theoretically appealing (tunable slope, only 2 params) but pays a steep
+  price for encoding the degree sequence as a joint partition rather than independent draws.</p>
+  <p><b>The tradeoff is model description cost vs data fit.</b> More parameters = better fit
+  to the data = fewer bits for the graph itself, but more bits to describe the model.
+  The best model minimizes the total.</p>
 </div>
 
 <p style="text-align:center;color:#aaa;font-size:0.82em;margin-top:30px;">
