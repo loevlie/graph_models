@@ -149,6 +149,75 @@ fn compare_all(
     })
 }
 
+/// Run the EXACT decision table model (no sampling). O(n + m + K²).
+#[pyfunction]
+#[pyo3(signature = (graph, base="er", min_frequency=10))]
+fn run_decision_table_exact(
+    graph: &PyGraph,
+    base: &str,
+    min_frequency: usize,
+) -> PyResult<PyObject> {
+    let base_model = match base {
+        "er" => BaseModel::ER,
+        "pa" => BaseModel::PA,
+        "config" => BaseModel::Config,
+        _ => return Err(pyo3::exceptions::PyValueError::new_err(
+            "base must be 'er', 'pa', or 'config'"
+        )),
+    };
+
+    let result = decision_table::decision_table_exact(
+        &graph.inner, base_model, min_frequency,
+    );
+
+    Python::with_gil(|py| {
+        let dict = PyDict::new_bound(py);
+        dict.set_item("bits_per_edge", result.bits_per_edge)?;
+        dict.set_item("table_entries", result.table_entries)?;
+        dict.set_item("feature_bits", result.feature_bits)?;
+        dict.set_item("table_cost_bits", result.table_cost_bits)?;
+        dict.set_item("encoding_cost_bits", result.encoding_cost_bits)?;
+        dict.set_item("base_only_bpe", result.base_only_bpe)?;
+        dict.set_item("improvement", result.improvement)?;
+        Ok(dict.into())
+    })
+}
+
+/// Run the CN-based decision table (degree bins + common neighbors).
+#[pyfunction]
+#[pyo3(signature = (graph, base="er", min_frequency=10, num_deg_bins=12))]
+fn run_decision_table_cn(
+    graph: &PyGraph,
+    base: &str,
+    min_frequency: usize,
+    num_deg_bins: usize,
+) -> PyResult<PyObject> {
+    let base_model = match base {
+        "er" => BaseModel::ER,
+        "pa" => BaseModel::PA,
+        "config" => BaseModel::Config,
+        _ => return Err(pyo3::exceptions::PyValueError::new_err(
+            "base must be 'er', 'pa', or 'config'"
+        )),
+    };
+
+    let result = decision_table::decision_table_cn(
+        &graph.inner, base_model, min_frequency, num_deg_bins,
+    );
+
+    Python::with_gil(|py| {
+        let dict = PyDict::new_bound(py);
+        dict.set_item("bits_per_edge", result.bits_per_edge)?;
+        dict.set_item("table_entries", result.table_entries)?;
+        dict.set_item("feature_bits", result.feature_bits)?;
+        dict.set_item("table_cost_bits", result.table_cost_bits)?;
+        dict.set_item("encoding_cost_bits", result.encoding_cost_bits)?;
+        dict.set_item("base_only_bpe", result.base_only_bpe)?;
+        dict.set_item("improvement", result.improvement)?;
+        Ok(dict.into())
+    })
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGraph>()?;
     m.add_function(wrap_pyfunction!(load_dataset, m)?)?;
@@ -156,6 +225,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(pa_bpe, m)?)?;
     m.add_function(wrap_pyfunction!(config_bpe, m)?)?;
     m.add_function(wrap_pyfunction!(run_decision_table, m)?)?;
+    m.add_function(wrap_pyfunction!(run_decision_table_exact, m)?)?;
+    m.add_function(wrap_pyfunction!(run_decision_table_cn, m)?)?;
     m.add_function(wrap_pyfunction!(compare_all, m)?)?;
     Ok(())
 }
