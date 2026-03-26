@@ -58,8 +58,33 @@ structure that no current model uses (community/cluster membership proxy).
 **How to apply:** Implemented in `decision_table.rs` as `decision_table_exact_cn`.
 ```
 
+## Experiment 6: Common neighbors + degree bins — Rust exact (2026-03-26)
+3D table: (deg_bin_u, deg_bin_v, cn_bin). 12 degree bins, 6 CN bins.
+CN computed via sorted neighbor merge: O(m * d_avg).
+
+```
+Dataset       ER      PA    Config   DT(old)  DT+CN
+USAir97     6.12    4.50     4.61     5.32    4.74
+Erdos      12.43    9.04     9.15     9.99    9.69
+as         14.08    9.75     9.69    13.34   10.00
+DBLP       16.99   16.18    15.82    15.79   11.92  ← -25%
+Gowalla    15.75   12.97    12.78    14.49   11.99  ← -6%
+Skitter    18.43   14.39    14.16    17.05   12.64  ← -11%
+YouTube    20.52   14.82    14.76    18.91   14.46  ← -2%
+```
+
+**DT+CN beats all models on every large graph.** CN is the killer feature.
+Table sizes: 175-285 entries (~6500 bits). Negligible on large graphs.
+CN computation: Skitter 70s, YouTube 76s (neighbor merge bottleneck).
+
+**Why:** Common neighbors captures local community structure that
+degree-only models (ER, PA, Config) completely miss. Two degree-5
+nodes in the same cluster have high CN → high edge prob. Two degree-5
+nodes in different clusters have CN=0 → low edge prob.
+
 ## Next steps
-- Common neighbors feature (Experiment 6)
 - Batch mode: share one table across a graph collection (advisor suggestion)
-- Richer per-node features: clustering coefficient, etc.
+- Optimize CN computation (parallelize with rayon?)
+- Try finer CN bins or additional features (Jaccard similarity?)
+- Integrate with actual shuffle coding pipeline
 - Compare against a small gradient-boosted tree model
