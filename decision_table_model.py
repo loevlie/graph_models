@@ -27,7 +27,7 @@ from collections import Counter, defaultdict
 from analyze_graphs import (
     download_and_extract, parse_tu_dataset, er_bits_per_edge,
     pa_bits_per_edge, configuration_model_bits_per_edge,
-    SZIP_DATASETS, TU_DATASETS, DATA_DIR
+    SZIP_DATASETS, REC_DATASETS, TU_DATASETS, DATA_DIR
 )
 
 OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -277,6 +277,8 @@ def main():
         ("USAir97", "SZIP", SZIP_DATASETS["USAir97"]),
         ("Erdos", "SZIP", SZIP_DATASETS["Erdos"]),
         ("as", "SZIP", SZIP_DATASETS["as"]),
+        ("DBLP", "REC", REC_DATASETS["DBLP"]),
+        ("Gowalla", "REC", REC_DATASETS["Gowalla"]),
     ]
 
     tu_tests = [
@@ -323,14 +325,17 @@ def main():
     print()
     print("* = single representative graph from collection")
 
-    # Detailed output for USAir97 with each base
-    for base_name in ['er', 'pa', 'config']:
-        print(f"\n{'='*80}")
-        print(f"DETAILED: USAir97 with base={base_name}")
-        print(f"{'='*80}")
-        cache_dir = os.path.join(DATA_DIR, "USAir97")
-        G = parse_tu_dataset("USAir97", cache_dir)[0]
-        decision_table_model(G, base=base_name, min_frequency=10, verbose=True)
+    # Detailed output for a small and large graph
+    for dname in ['USAir97', 'DBLP']:
+        for base_name in ['er', 'pa']:
+            print(f"\n{'='*80}")
+            print(f"DETAILED: {dname} with base={base_name}")
+            print(f"{'='*80}")
+            cache_dir = os.path.join(DATA_DIR, dname)
+            G = parse_tu_dataset(dname, cache_dir)[0]
+            ns = 2000000 if G.number_of_nodes() > 10000 else 500000
+            decision_table_model(G, base=base_name, min_frequency=10,
+                                 n_samples=ns, verbose=True)
 
 
 if __name__ == "__main__":
